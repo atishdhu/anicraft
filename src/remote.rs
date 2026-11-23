@@ -8,11 +8,10 @@
 //! open), so the two never share an undo step. Typing in a field doesn't hold it back: the
 //! person's typed change is committed as its own step first, as clicking elsewhere would.
 
-use crate::app::{App, Drag};
+use crate::app::App;
+use crate::live::{Live, person_is_dragging};
 use crate::platform;
-use anicraft_cli::{control, mcp};
-use anicraft_engine::Session;
-use serde_json::Value;
+use anicraft_cli::control;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -68,11 +67,6 @@ pub fn port(app: &App) -> Option<u16> {
     app.remote.as_ref().map(|r| r.server.port)
 }
 
-/// Whether the person is in the middle of an edit a remote one must not join.
-fn person_is_dragging(app: &App, ctx: &egui::Context) -> bool {
-    app.drag != Drag::None || app.plugin_dialog.is_some() || app.audio_keys.is_some() || (app.s.in_gesture() && ctx.egui_is_using_pointer())
-}
-
 /// Runs the waiting calls: at the start of a frame, so their edits draw in this one.
 pub fn poll(app: &mut App, ctx: &egui::Context) {
     let Some(r) = app.remote.as_mut() else { return };
@@ -110,30 +104,6 @@ pub fn finish(app: &mut App) {
         if ours {
             let _ = std::fs::remove_file(path);
         }
-    }
-}
-
-/// The window as the tools' host: commands run with the follow-up the person's own get (the
-/// status line, the view a new document resets, Open Recent).
-struct Live<'a>(&'a mut App);
-
-impl mcp::Host for Live<'_> {
-    fn session(&self) -> &Session {
-        &self.0.s
-    }
-    fn execute(&mut self, id: &str, params: &Value) -> Result<Value, String> {
-        let selected = self.0.s.selection.len();
-        let revision = self.0.s.revision;
-        let v = self.0.s.execute(id, params).map_err(|e| e.to_string())?;
-        // An edit to the document behind the start screen: show the document, so the person
-        // sees it land (ADR 0059's start screen otherwise covers the workspace).
-        if self.0.s.revision != revision {
-            self.0.start = None;
-        }
-        // The window's own follow-up (its settings, Open Recent) is not the assistant's file
-        // access: the automation roots apply to the command above only (ADR 0124).
-        anicraft_engine::access::unconfined(|| self.0.announce(id, &v, selected));
-        Ok(v)
     }
 }
 

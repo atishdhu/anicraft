@@ -4762,6 +4762,8 @@ impl App {
         // An assistant's edits (ADR 0104), before anything draws: they show in this frame.
         #[cfg(not(target_arch = "wasm32"))]
         crate::remote::poll(self, &ctx);
+        #[cfg(target_arch = "wasm32")]
+        crate::web_api::poll(self, &ctx);
         self.poll_font_scan(&ctx);
         self.follow_system_look(&ctx);
         if let Some(p) = platform::picked_file() {

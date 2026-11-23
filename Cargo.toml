@@ -45,6 +45,8 @@ craft-xfl = { git = "https://github.com/storytold/craft-libs", rev = "b67b9f90c5
 # bounded record parser. The same reviewed commit as craft-mime and craft-gif.
 craft-csv = { git = "https://github.com/storytold/craft-libs", rev = "f0f4758c01581d79577b9bf5046c06f4e77b1f18" }
 craft-xml = { git = "https://github.com/storytold/craft-libs", rev = "b67b9f90c50091a3090f93fa054c34e409edba11" }
+# window.anicraft in the web build: the page command API every Craft web build shares.
+craft-web-api = { git = "https://github.com/storytold/craft-libs", rev = "205042e406b630cda653990649264a78fea6296b", version = "0.1.0" }
 # The GPU stage (ADR 0019) uses the wgpu that eframe's egui-wgpu brings, with the same
 # (default) features, so the tree keeps one wgpu build.
 wgpu = "30"
@@ -160,6 +162,8 @@ winreg = "0.55"
 # smaller. The browser glue is wasm-bindgen's (MIT OR Apache-2.0), already under eframe's web
 # backend.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+anicraft-cli = { path = "crates/cli" }
+craft-web-api.workspace = true
 eframe = { version = "0.36", default-features = false, features = ["accesskit", "default_fonts", "glow"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"

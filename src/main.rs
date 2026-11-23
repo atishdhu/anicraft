@@ -82,6 +82,7 @@ mod macros_ui_tests;
 mod macros_ui;
 mod plugins_ui;
 mod prefs;
+mod live;
 mod recent;
 #[cfg(not(target_arch = "wasm32"))]
 mod remote;
@@ -107,6 +108,8 @@ mod timeline;
 mod trace_dialog;
 #[cfg(target_arch = "wasm32")]
 mod web;
+#[cfg(target_arch = "wasm32")]
+mod web_api;
 mod widthtool;
 mod windows;
 mod xform;

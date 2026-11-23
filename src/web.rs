@@ -92,6 +92,9 @@ async fn run() -> Result<(), String> {
             Box::new(move |cc| {
                 CTX.with(|c| *c.borrow_mut() = Some(cc.egui_ctx.clone()));
                 let mut app = crate::app::App::new(cc, session, None);
+                if let Err(e) = crate::web_api::install() {
+                    web_sys::console::error_2(&JsValue::from_str("window.anicraft is not available"), &e); // i18n-exempt: console
+                }
                 // The start screen, unless it was switched off (ADR 0059).
                 if app.prefs.start_screen {
                     crate::start::open(&mut app);
@@ -122,7 +125,7 @@ fn element(id: &str) -> Option<web_sys::Element> {
     document()?.get_element_by_id(id)
 }
 
-fn repaint() {
+pub(crate) fn repaint() {
     CTX.with(|c| {
         if let Some(ctx) = c.borrow().as_ref() {
             ctx.request_repaint();
@@ -135,6 +138,10 @@ fn repaint() {
 /// Opens the browser's file picker for `cmd`, showing files with these extensions. The file
 /// arrives through [`take_picked`]; a cancelled picker delivers nothing.
 pub fn pick_file(cmd: &'static str, exts: &[&str]) {
+    // A page that answers file prompts itself (window.anicraft.onPickFile) gets them instead.
+    if crate::web_api::pick(cmd, exts) {
+        return;
+    }
     let Some(doc) = document() else { return };
     let Some(body) = doc.body() else { return };
     // One picker at a time: a cancelled one is still on the page.
@@ -172,6 +179,11 @@ async fn read_picked(cmd: &'static str, file: web_sys::File) {
             Err(_) => Err(tr!("the browser could not read it").to_string()),
         }
     };
+    deliver_picked(cmd, name, data);
+}
+
+/// A file for `cmd`, as the picker delivers it: opened on the next frame.
+pub fn deliver_picked(cmd: &'static str, name: String, data: Result<Vec<u8>, String>) {
     PICKED.with(|p| p.borrow_mut().push(Picked { cmd, name, data }));
     repaint();
 }
@@ -248,6 +260,9 @@ pub fn take_dropped() -> Option<(u64, ReadFiles)> {
 /// Offers `data` as a download named after `path`'s file name.
 pub fn download(path: &Path, data: &[u8]) {
     let name = path.file_name().map_or_else(|| "download".to_string(), |n| n.to_string_lossy().into_owned());
+    if crate::web_api::capture(&name, data) {
+        return;
+    }
     if let Err(e) = try_download(&name, data) {
         web_sys::console::error_2(&JsValue::from_str(&format!("could not download {name}")), &e); // i18n-exempt: console
     }

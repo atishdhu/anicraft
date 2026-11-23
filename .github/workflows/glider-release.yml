@@ -1,0 +1,68 @@
+# The assets Glider's AniCraft app builds its image from: the web editor (with window.anicraft)
+# and anicraft-cli for Linux, with SHA256SUMS.txt. Runs on a v<version>-glider.<n> tag.
+name: Glider release
+
+on:
+  push:
+    tags: ["v*-glider.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95"
+          targets: wasm32-unknown-unknown
+      - name: wasm-bindgen
+        run: cargo install wasm-bindgen-cli --locked --version "$(awk '/^name = "wasm-bindgen"$/ { getline; gsub(/version = |"/, ""); print; exit }' Cargo.lock)"
+      - name: Build
+        run: |
+          scripts/build-web.sh
+          v="${GITHUB_REF_NAME#v}"
+          mv web "anicraft-web-$v"
+          zip -qr "anicraft-web-$v.zip" "anicraft-web-$v"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: anicraft-web-*.zip
+
+  cli:
+    strategy:
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, arch: x86_64 }
+          - { runner: ubuntu-24.04-arm, arch: aarch64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95"
+      - name: Build
+        run: |
+          cargo build --release --locked -p anicraft-cli
+          tar -czf "anicraft-cli-${GITHUB_REF_NAME#v}-linux-${{ matrix.arch }}.tar.gz" -C target/release anicraft-cli
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.arch }}
+          path: anicraft-cli-*.tar.gz
+
+  release:
+    needs: [web, cli]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum anicraft-* > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" anicraft-* SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --prerelease --title "AniCraft $GITHUB_REF_NAME for Glider" --notes "AniCraft with window.anicraft for Glider's AniCraft app."
